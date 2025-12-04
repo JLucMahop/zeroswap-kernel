@@ -487,8 +487,8 @@ static void swap_writepage_bdev_async(struct folio *folio,
 	}else{
 		pr_info("NOT RELATED ADDR %lx %lx",vaddr,folio_pfn(folio));
 	}
-	num_pages_out+=1;
-	pr_info("NUM_OUT %d",num_pages_out);
+	//num_pages_out+=1;
+	//pr_info("NUM_OUT %d",num_pages_out);
 	/* zeroswap */	
 	submit_bio(bio);
 }

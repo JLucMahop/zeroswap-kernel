@@ -16,7 +16,7 @@
 extern struct xarray dbs_pfn_map; // Global XArray for storing page frame numbers to virtual addresses
 
 /* zeroswap */
-#define MAX_TRACKED_PAGES (1UL << 26)  // 4 million pages
+#define MAX_TRACKED_PAGES (1UL << 28)  // 4 million pages
 
 typedef struct {
     long *pages; //long

@@ -90,6 +90,7 @@
 #include "internal.h"
 #include "swap.h"
 #include "dbs_pmap.h"
+ #include "myvals.h"
 #include <linux/ktime.h>
 #include <linux/fs.h>
 #include <linux/types.h>
@@ -4287,9 +4288,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	get_process_name_using_vma(vma, process_name);
 	bool is_fc = strcmp(process_name,"firecracker") == 0;
 	bool is_dbs = false;
-	//u64 start_ns, end_ns, delta_ns;
 
-	//start_ns = ktime_get_ns(); 
 	if ( is_fc){
 		is_dbs = pages_va_map_get(va2sec_map,vmf->address)==-1?true:false;
 	}
@@ -4408,6 +4407,11 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 			if ( is_fc){
 				// Host is going to reload the page content
 				pages_va_map_set(va2sec_map,vmf->address, 0); //,true,false
+
+				mutex_lock(&vals_lock);
+				host_in_total++;
+				mutex_unlock(&vals_lock);
+
 				if (is_dbs) {	
 					/* Page has been "swapped by Guest".
 					   Allocate a new folio and add it to the swap cache,
@@ -4415,8 +4419,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 					//void *shadow = NULL;
 					// Fast path: directly allocate and map a new folio, skip swap cache
 					//folio = vma_alloc_folio(GFP_HIGHUSER_MOVABLE, 0, vma, vmf->address);
-					num_dbs +=1;
-					pr_info("DBS: %lx, num_dbs: %d\n", vmf->address, num_dbs);
+					/*num_dbs +=1;*/
+					pr_info("DBS: ");
 					struct mempolicy *mpol;
 
 					pgoff_t ilx;
@@ -4425,8 +4429,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 
 					if (folio) {
 						__folio_mark_uptodate(folio);
-						/*add_mm_counter(vma->vm_mm, MM_ANONPAGES, 1);
-						add_mm_counter(vma->vm_mm, MM_SWAPENTS, -1);*/
+						add_mm_counter(vma->vm_mm, MM_ANONPAGES, 1);
+						add_mm_counter(vma->vm_mm, MM_SWAPENTS, -1);
 						swap_free_nr(entry, 1);
 
 						vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address, &vmf->ptl);
@@ -4439,7 +4443,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 						}
 
 						folio_add_new_anon_rmap(folio, vma, vmf->address, RMAP_NONE); //RMAP_EXCLUSIVE
-						//folio_add_lru_vma(folio, vma);
+						folio_add_lru_vma(folio, vma);
 						//folio_add_lru(folio);
 						pte_unmap_unlock(vmf->pte, vmf->ptl);
 
@@ -4448,6 +4452,13 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 						delta_ns = end_ns - start_ns;
 
 						pr_info("DBS_ELAPSED,%llu\n", delta_ns);*/
+
+
+						mutex_lock(&vals_lock);
+						host_blank_realloc++;
+						mutex_unlock(&vals_lock);
+
+
 						goto out;
 					} else {
 						pr_err("DBS_OOM_ERROR: Failed to allocate folio\n");
@@ -4456,11 +4467,12 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 					}
 
 				} else {
-					// Page have been swapped out by Guest, just reload it
+
+					// Page have not been swapped out by Guest, just reload it
 					folio = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE, vmf);
 				}
-				norm_dbs += 1;
-				pr_info("NORM_FC: %lx, norm_dbs: %d\n", vmf->address, norm_dbs);
+				/*norm_dbs += 1;
+				pr_info("NORM_FC: %lx, norm_dbs: %d\n", vmf->address, norm_dbs);*/
 
 			} else {
 					// Normal Process page

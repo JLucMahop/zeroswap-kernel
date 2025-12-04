@@ -82,8 +82,8 @@
  #include <trace/events/migrate.h>
  
  #include "internal.h"
- //#include "dbs_map.h"
  #include "dbs_pmap.h"
+ #include "myvals.h"
  #include <linux/ktime.h>
  #include <linux/fs.h>
 #include <linux/types.h>
@@ -1714,6 +1714,9 @@ void write_to_swapout(unsigned long addr)
 		/* Save the physical address that will later be written to disk
 			This is important to avoid important latency getting the virtual address related to the swap out folio in page-io
 		*/
+		mutex_lock(&vals_lock);
+		host_out_total++;
+		mutex_unlock(&vals_lock);
 		void *vaddr_entry = xa_load(&dbs_pfn_map, folio_pfn(folio));
 		if (vaddr_entry) {
 			pr_info("VALUES OVERLAPPING HERE %lx from %lx\n", xa_to_value(vaddr_entry), folio_pfn(folio));
